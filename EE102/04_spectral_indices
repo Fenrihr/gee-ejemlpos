@@ -1,0 +1,56 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #d63000 */ee.FeatureCollection(
+        [ee.Feature(
+            ee.Geometry.Point([-114.68490600585943, 36.112361959242996]),
+            {
+              "system:index": "0"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-74.43649291992193, -8.426187168471573]),
+            {
+              "system:index": "1"
+            })]),
+    waterPt = /* color: #0031ff */ee.Feature(
+        ee.Geometry.Point([-114.39067840576172, 36.33642350563179]),
+        {
+          "class": "water",
+          "system:index": "0"
+        }),
+    shadowPt = /* color: #ff00e5 */ee.Feature(
+        ee.Geometry.Point([-114.86763954162598, 36.08580047351335]),
+        {
+          "class": "shadow",
+          "system:index": "0"
+        }),
+    region = /* color: #98ff00 */ee.Geometry.Polygon(
+        [[[-115.2139663696289, 36.45111307831851],
+          [-115.2139663696289, 35.93659844948654],
+          [-114.0768814086914, 35.93659844948654],
+          [-114.0768814086914, 36.45111307831851]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Spectral indices.
+var prepare = function(year) {
+  var date = ee.Date.fromYMD(year, 1, 1)
+  return ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+      .filterDate(date, date.advance(1, "year"))
+      .filter(ee.Filter.lt('CLOUD_COVER', 5))
+      .filterBounds(geometry)
+      .select('B[0-9]')
+      .median()
+}
+var median = prepare(2015)
+Map.addLayer(median, {max:0.3, bands:["B4", "B3", "B2"]})
+
+var indices = ee.Image.cat(
+  median.expression("(b(4) - b(3)) / (b(4) + b(3))").rename("ndvi"),
+  median.expression("(b(2) - b(4)) / (b(2) + b(4))").rename("ndwi"),
+  median.expression("(b(2) - b(5)) / (b(2) + b(5))").rename("mndwi"))
+Map.addLayer(indices, {min:[1, -1, -1], max:[-1, 1, 1]}, "Indices", true)    // <- Tricky
+
+// How well are these indices working?
+print(ui.Chart.image.regions(indices, [waterPt, shadowPt], ee.Reducer.mean(), 30))
+print(ui.Chart.image.histogram(indices, region, 300))
+
+// Pick some thresholds.
+var water = indices.expression('b("ndvi") < 0 && b("ndwi") > 0 && b("mndwi") > 0.5')
+Map.addLayer(water, {min:0, max:1}, "Water", false)

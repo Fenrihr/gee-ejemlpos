@@ -1,0 +1,15 @@
+ui.root.clear();
+
+function addLabel() {
+  var label = new ui.Label("Hello, world!");
+  ui.root.add(label);
+}
+
+// Named arguments allow us to configure the widget
+// easily during its creation.
+var button = new ui.Button({
+  label: 'Click me!',
+  onClick: addLabel,
+});
+
+ui.root.add(button);

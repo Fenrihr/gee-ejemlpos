@@ -1,0 +1,32 @@
+// Center-pivot Irrigation Detector.
+
+Map.setCenter(-106.06, 37.71, 12);
+var palette = [
+  'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718',
+  '74A901', '66A000', '529400', '3E8601', '207401', '056201',
+  '004C00', '023B01', '012E01', '011D01', '011301'];
+
+// Just display the image with the palette. 
+var image = ee.Image('LT5_L1T_8DAY_EVI/20110618');
+var threshold = image.gt(0.3)    // Pick a threshold for "active" vegetation,
+Map.addLayer(image, {min:0, max: 1, palette: palette}, 'Landsat EVI');
+Map.addLayer(threshold, null, "Threshold", false)
+
+// Find points which have a distance between min and max and which are their own local maximum.
+// This will be the center of each "blob".
+var sqPixels = threshold.not().fastDistanceTransform()            // Distance in pixels^2.
+var distance = sqPixels.sqrt().multiply(ee.Image.pixelArea().sqrt())  // Convert to meters.
+var localMax = distance.focal_max({radius: 300, units: 'meters'})
+var blobs = distance.gt(360).and(distance.lt(425)).and(distance.eq(localMax))
+var result = distance.updateMask(blobs)
+
+Map.addLayer(distance.updateMask(distance), {min:0, max:400}, "V3 - Distance")
+Map.addLayer(buffer(result), {palette: "red"}, "V3 - Results")
+
+// Buffer each point in an image by its value taken as a distance in meters.
+function buffer(distance) {
+  distance = distance.divide(ee.Image.pixelArea().sqrt()) // Convert to pixels.
+  distance = distance.multiply(distance).int()            // Squared because rsed wants d^2.
+  var result = distance.rsedTransform()
+  return result.updateMask(result)
+}

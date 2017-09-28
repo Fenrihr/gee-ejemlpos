@@ -1,0 +1,32 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #98ff00 */ee.Geometry.Point([16.35, 48.21]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var landsat = ee.ImageCollection("LANDSAT/LC8_L1T")
+    .filterDate('2016-01-01', '2017-01-01')
+    .filterBounds(geometry)
+    
+var ndvi = landsat.map(function(image) {
+  var result = image.normalizedDifference(["B5", "B4"]).rename("ndvi")
+  return image.addBands(result);
+})
+
+var maxNDVI = ndvi.max().select("ndvi");
+
+// Zonal statistics, stats for each 100m of elevation.
+var elevation = ee.Image("USGS/SRTMGL1_003")
+var zones = ee.Image(0)
+    .where(elevation.gt(100), 1)
+    .where(elevation.gt(200), 2)
+    .where(elevation.gt(300), 3)
+    .where(elevation.gt(400), 4)
+Map.addLayer(zones)
+
+var region = geometry.buffer(10000)
+Map.addLayer(region, {color: "yellow"}, "Region")
+
+var stats = maxNDVI.addBands(zones).reduceRegion({
+  reducer: ee.Reducer.mean().group(1),
+  geometry: region,
+  scale: 30
+})
+print(stats)

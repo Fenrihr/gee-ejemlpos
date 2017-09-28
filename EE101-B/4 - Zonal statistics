@@ -1,0 +1,38 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #98ff00 */ee.Geometry.Point([-122.30287513732901, 37.441115780341605]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var landsat = ee.ImageCollection("LANDSAT/LC8_L1T")
+    .filterDate('2016-01-01', '2017-01-01')
+    .filterBounds(geometry)
+    
+var ndvi = landsat.map(function(image) {
+  var result = image.normalizedDifference(["B5", "B4"]).rename("ndvi")
+  return image.addBands(result);
+})
+
+var maxNDVI = ndvi.max().select("ndvi");
+
+// The region over which to gather stats.
+var region = geometry.buffer(20000)
+
+// Create zones from each 200m of elevation.
+var elevation = ee.Image("USGS/SRTMGL1_003")
+var zones = ee.Image(0)
+    .where(elevation.gt(200), 200)
+    .where(elevation.gt(400), 400)
+    .where(elevation.gt(600), 600)
+    .updateMask(elevation.neq(0))
+    .clip(region)
+
+Map.addLayer(maxNDVI, {min:0, max:1}, "Max NDVI")
+Map.addLayer(region, {color: "yellow"}, "Region")
+Map.addLayer(zones, {}, "Elevation zones")
+Map.centerObject(geometry, 10)
+
+var stats = maxNDVI.addBands(zones).reduceRegion({
+  reducer: ee.Reducer.mean().group(1),
+  geometry: region,
+  scale: 30
+})
+print(stats)
+Map.centerObject(geometry, 10)

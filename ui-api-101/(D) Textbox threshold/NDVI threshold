@@ -1,0 +1,38 @@
+// Begin helper snippet.
+var ndvi = ee.ImageCollection('LANDSAT/LC8_L1T_TOA')
+    .filterDate('2015-01-01', '2015-10-30')
+    .map(function(image) {
+      return image.normalizedDifference(['B5', 'B4']);
+    })
+var vis = {min: 0, max: 1, palette: ['99c199', '66a266', '006400']};
+Map.addLayer(ndvi, vis, 'NDVI');
+Map.setCenter(-94.84497, 39.01918, 8);
+// End helper snippet.
+
+var minLabel = ui.Label({
+  value: 'Minimum NDVI:',
+  style: {stretch: 'vertical'}
+});
+
+var textbox = ui.Textbox({
+  placeholder: 'between 0 and 1',
+  onChange: function(value) {
+    Map.layers().reset();
+    var threshold = Number(value);
+    var ndviMean = ndvi.mean();
+    var masked = ndviMean.mask(ndviMean.gt(threshold));
+    Map.addLayer(masked, vis, 'NDVI');
+  },
+  style: {width: '100px'}
+});
+
+var panel = ui.Panel({
+  widgets: [minLabel, textbox],
+  layout: ui.Panel.Layout.flow('horizontal')
+})
+
+Map.add(panel);
+
+// Set defaults.
+Map.setCenter(-94.84497, 39.01918, 8);
+textbox.set('value', .3);

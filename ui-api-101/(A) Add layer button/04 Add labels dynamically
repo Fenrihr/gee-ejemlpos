@@ -1,0 +1,12 @@
+ui.root.clear();
+
+function addLabel() {
+  var label = new ui.Label("Hello, world!");
+  ui.root.add(label);
+  // Print the number of widgets in the ui.root.
+  print(ui.root.widgets().length() + " widgets in the ui.root.");
+}
+
+var button = new ui.Button('Click me!', addLabel);
+
+ui.root.add(button);

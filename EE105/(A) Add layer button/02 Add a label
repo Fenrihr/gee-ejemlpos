@@ -1,0 +1,4 @@
+ui.root.clear();
+
+var label = new ui.Label("Hello, world!");
+ui.root.add(label);

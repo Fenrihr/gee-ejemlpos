@@ -1,0 +1,16 @@
+ui.root.clear();
+
+var button = new ui.Button({
+  label: 'Click me!',
+});
+
+ui.root.add(button);
+
+var newMap = ui.Map();
+ui.root.add(newMap);
+
+function addLayer() {
+  map.addLayer(map.getCenter(), {color: 'FF0000'});
+}
+
+button.onClick(addLayer);

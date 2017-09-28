@@ -1,0 +1,141 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var l8toa = ee.ImageCollection("LANDSAT/LC8_L1T_TOA"),
+    roi = /* color: #d63000 */ee.Geometry.Point([-121.3640570640564, 37.939679258689104]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Harmonic Fitting
+
+Map.centerObject(roi, 10) 
+
+// This field contains UNIX time in milliseconds.
+var timeField = 'system:time_start'
+
+// Use this function to mask clouds in Landsat 8 imagery.
+var maskClouds = function(image) {
+  var quality = image.select('BQA')
+  var cloud01 = quality.eq(61440)
+  var cloud02 = quality.eq(53248)
+  var cloud03 = quality.eq(28672)
+  var mask = cloud01.or(cloud02).or(cloud03).not()
+  return image.updateMask(mask)
+}
+
+// Use this function to add variables for NDVI, time and a constant
+// to Landsat 8 imagery.
+var addVariables = function(image) {
+  // Compute time in fractional years since the epoch.
+  var years = image.date().difference(ee.Date('2000-01-01'), 'year')
+  // Return the orginal image with the added bands.
+  return image
+    .addBands(image.normalizedDifference(['B5', 'B4']).rename('NDVI'))
+    .addBands(ee.Image(years).rename('t'))    // Time band
+    .addBands(ee.Image.constant(1))           // Constant band
+    .float()
+}
+
+// Remove clouds, add variables and filter to the area of interest.
+var filteredLandsat = l8toa
+  .filterBounds(roi)
+  .map(maskClouds)
+  .map(addVariables)
+
+// Plot a time series of NDVI at a single location.
+var l8Chart = ui.Chart.image.series(filteredLandsat.select('NDVI'), roi)
+    .setChartType('ScatterChart')
+    .setOptions({
+      title: 'Landsat 8 NDVI time series at ROI',
+      trendlines: {0: {
+        color: 'CC0000'
+      }},
+      lineWidth: 1,
+      pointSize: 3,
+    })
+print(l8Chart)
+
+// Linear trend ----------------------------------------------------------------
+
+// Names of the independent and dependent variables
+var independents = ee.List(['constant', 't'])
+var dependent = 'NDVI'
+
+// Compute a linear trend.  This will have two bands: 'residuals' and 
+// a 2x1 band called coefficients (columns are for dependent variables).
+var trend = filteredLandsat.select(independents.add(dependent))
+    .reduce(ee.Reducer.linearRegression(independents.length(), 1))
+// Map.addLayer(trend, {}, 'trend array image')
+
+// Flatten the coefficients into a 2-band image
+var coefficients = trend.select('coefficients')
+  .arrayProject([0])
+  .arrayFlatten([independents])
+
+// Compute a de-trended series.
+var detrended = filteredLandsat.map(function(image) {
+  var modeled = image.select(independents).multiply(coefficients).reduce('sum')
+  return image.select(dependent)
+      .subtract(modeled)
+      .rename(dependent)
+      .copyProperties(image, [timeField])
+})
+
+// Plot the detrended results.
+var detrendedChart = ui.Chart.image.series(detrended, roi, null, 30)
+    .setOptions({
+      title: 'Detrended Landsat time series at ROI',
+      lineWidth: 1,
+      pointSize: 3,
+    })
+print(detrendedChart)
+
+// Harmonic trend ----------------------------------------------------------------
+// Use these independent variables in the harmonic regression.
+var harmonicIndependents = ee.List(['constant', 't', 'cos', 'sin'])
+
+// Add harmonic terms as new image bands.
+var harmonicLandsat = filteredLandsat.map(function(image) {
+  var timeRadians = image.select('t').multiply(2 * Math.PI)
+  return image
+    .addBands(timeRadians.cos().rename('cos'))
+    .addBands(timeRadians.sin().rename('sin'))
+})
+  
+// The output of the regression reduction is a 4x1 array image.
+var harmonicTrend = harmonicLandsat
+  .select(harmonicIndependents.add(dependent))
+  .reduce(ee.Reducer.linearRegression(harmonicIndependents.length(), 1))
+
+// Turn the array image into a multi-band image of coefficients.
+var harmonicTrendCoefficients = harmonicTrend.select('coefficients')
+  .arrayProject([0])
+  .arrayFlatten([harmonicIndependents])
+
+// Compute fitted values.
+var fittedHarmonic = harmonicLandsat.map(function(image) {
+  var fit = image.select(harmonicIndependents)
+      .multiply(harmonicTrendCoefficients)
+      .reduce('sum')
+      .rename('fitted')
+  return image.addBands(fit)
+      .addBands(image.select("NDVI").subtract(fit).pow(2).rename("error"))
+
+})
+
+// Plot the fitted model and the original data at the ROI.
+print(ui.Chart.image.series(
+  fittedHarmonic.select(['fitted','NDVI']), roi, ee.Reducer.mean(), 30)
+    .setSeriesNames(['NDVI', 'fitted'])
+    .setOptions({
+      title: 'Harmonic model: original and fitted values',
+      lineWidth: 1,
+      pointSize: 3,
+}))
+
+// Compute phase and amplitude.
+var sin = harmonicTrendCoefficients.select('sin');
+var cos = harmonicTrendCoefficients.select('cos');
+var amplitude = cos.hypot(sin).multiply(5);   // Scaled by 5 to get it close to [0:1]
+var phase = sin.atan2(cos).unitScale(-Math.PI, Math.PI);
+var rmse = fittedHarmonic.select("error").reduce(ee.Reducer.sum()).sqrt()
+
+// Apply an HSV transform to colorize: phase=hue, amplitude=value.
+var seasonality = ee.Image.cat(phase, rmse, amplitude).hsvToRgb();
+Map.addLayer(seasonality, {}, 'Seasonality');

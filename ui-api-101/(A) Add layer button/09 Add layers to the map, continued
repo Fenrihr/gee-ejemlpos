@@ -1,0 +1,18 @@
+ui.root.clear();
+
+var button = new ui.Button({
+  label: 'Click me!',
+});
+
+ui.root.add(button);
+
+var knobsMap = ui.Map();
+ui.root.add(knobsMap);
+
+function addLayer() {
+  var layer = ui.Map.Layer(knobsMap.getCenter(), {color: 'FF0000'});
+  knobsMap.layers().add(layer);
+  print(knobsMap.layers());
+}
+
+button.onClick(addLayer);

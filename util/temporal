@@ -1,0 +1,56 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #d63000 */ee.Geometry.Polygon(
+        [[[111.26953325, -11.005904459659451],
+          [111.26953325, -44.276671273775165],
+          [154.599613375, -44.276671273775165],
+          [154.599613375, -11.005904459659451]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+/* Creates a collection of mosaics with a given temporal cadence.
+ * 
+ * Returns a collection of 'count' mosaics; each mosaic also includes a band with the
+ * number of valid pixels  and the date (in milliseconds) of the pixel used.
+ *
+ * collection - the collection from which to make the mosaics.
+ * start - the date of the first mosaics (either a string or an ee.Date)
+ * count - the number of mosaics to make
+ * interval - The time between mosaics, in units of "units".
+ * units - The units of step (day, week, month, year; see ee ee.Date.advance)
+ * reducer - a reducer to use on the stack of images at each time interval.  Defaults to median.
+ */
+exports.temporalCollection = function(collection, start, count, interval, units, reducer) {
+  start = ee.Date(start);
+  var steps = ee.List.sequence(0, ee.Number(count).subtract(1)).map(function(n) {
+    // Compute temporal extent for this interval.
+    var begin = start.advance(ee.Number(interval).multiply(n), units)
+    var end = begin.advance(interval, units)
+    // Add a date band and mask it to the union of masks of input bands.
+    var images = collection.filterDate(begin, end).map(function(img) {
+      var date = ee.Image.constant(img.date().millis()).rename("date").int()
+      var mask = img.mask().reduce(ee.Reducer.max())
+      return img.addBands(date.updateMask(mask))
+    })
+    if (reducer == undefined) {
+      reducer = ee.Reducer.median()
+    }
+    //var count = images.select([0], ["count"]).count()
+    var mosaic = images.reduce(reducer)
+    // Strip the reducer suffix off the bands.
+    var bands = mosaic.bandNames().map(function(s) { return ee.String(s).replace("_.*", "") })
+    return images.reduce(reducer).rename(bands)
+        .set("system:time_start", begin.millis())
+        .set("system:id", begin.format("YYYYMMdd"))
+
+  })
+  // Filter out empty images (no date band).
+  return ee.ImageCollection(steps)//.filter(ee.Filter.listContains("system:band_names", "date"))
+}
+
+var L8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+  .filterBounds(geometry)
+  .filter(ee.Filter.lt('CLOUD_COVER', 20))
+
+var mosaics = exports.temporalCollection(L8, "2016-01-01", 8, 90.125, "day")
+  .map(function(img) { return img.visualize({max: 0.3, bands: ["B4", "B3", "B2"]}) })
+
+Export.video.toDrive({collection: mosaics, dimensions: "512", region: geometry, framesPerSecond: 4})
+Map.addLayer(mosaics)

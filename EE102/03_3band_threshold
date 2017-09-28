@@ -1,0 +1,52 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #d63000 */ee.FeatureCollection(
+        [ee.Feature(
+            ee.Geometry.Point([-114.68490600585943, 36.112361959242996]),
+            {
+              "system:index": "0"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-74.43649291992193, -8.426187168471573]),
+            {
+              "system:index": "1"
+            })]),
+    region = /* color: #98ff00 */ee.Geometry.Polygon(
+        [[[-115.2139663696289, 36.45111307831851],
+          [-115.2139663696289, 35.93659844948654],
+          [-114.0768814086914, 35.93659844948654],
+          [-114.0768814086914, 36.45111307831851]]], null, false),
+    waterPt = /* color: #0031ff */ee.Feature(
+        ee.Geometry.Point([-114.39067840576172, 36.33642350563179]),
+        {
+          "class": "water",
+          "system:index": "0"
+        }),
+    shadowPt = /* color: #ff00e5 */ee.Feature(
+        ee.Geometry.Point([-114.86763954162598, 36.08580047351335]),
+        {
+          "class": "shadow",
+          "system:index": "0"
+        });
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// 3-band threshold
+var prepare = function(year) {
+  var date = ee.Date.fromYMD(year, 1, 1)
+  return ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+      .filterDate(date, date.advance(1, "year"))
+      .filter(ee.Filter.lt('CLOUD_COVER', 5))
+      .filterBounds(geometry)
+      .select('B[0-9]')
+      .median()
+}
+var median = prepare(2015)
+
+// Plot some spectra to find some separable bands.
+print(ui.Chart.image.regions(median, [waterPt, shadowPt], ee.Reducer.mean(), 30, "class"))
+
+// Print histograms to select thresholds.
+print(ui.Chart.image.histogram(median.select("B4", "B5", "B6"), region, 300))
+
+// Apply thresholds
+var water = median.select("B4", "B5", "B6").lt([0.1, 0.02, 0.016])
+Map.addLayer(water, {}, "Threshold", true)
+

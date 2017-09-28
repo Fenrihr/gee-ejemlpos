@@ -1,0 +1,30 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #98ff00 */ee.Geometry.Point([-122.30287513732901, 37.441115780341605]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var landsat = ee.ImageCollection("LANDSAT/LC8_L1T")
+    .filterDate('2016-01-01', '2017-01-01')
+    .filterBounds(geometry)
+
+var composite = ee.Algorithms.Landsat.simpleComposite({
+  collection: landsat,
+  asFloat: true
+})
+
+var vis = {
+  "RGB": {bands: ["B4", "B3", "B2"], min:0, max: 0.3},
+  "False Color": {bands: ["B5", "B4", "B3"], min:0, max: [0.5, 0.3, 0.3]},
+  "Thermal": {bands: ["B10"], min: 280, max: 310, palette: ["blue", "red", "orange", "yellow"]}
+}
+
+var maps = [];
+for (var label in vis) {
+  var map = ui.Map().setControlVisibility(false)
+  map.addLayer(composite, vis[label])
+  map.add(ui.Label(label))
+  maps.push(map);
+}
+
+ui.root.widgets().reset(maps)
+var linker = ui.Map.Linker(maps);
+
+maps[0].centerObject(geometry, 11)

@@ -1,0 +1,24 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #98ff00 */ee.Geometry.Point([16.35, 48.21]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var landsat = ee.ImageCollection("LANDSAT/LC8_L1T")
+    .filterDate('2016-01-01', '2017-01-01')
+    .filterBounds(geometry)
+    
+var ndvi = landsat.map(function(image) {
+  return image.normalizedDifference(["B5", "B4"]).rename("ndvi");
+})
+
+Map.addLayer(ndvi.max(), {min:0, max:1}, "NDVI")
+Map.centerObject(geometry, 11)
+
+var region = geometry.buffer(10000)
+Map.addLayer(region, {color: "yellow"}, "Region")
+
+Export.image.toDrive({
+  image: ndvi.max(), 
+  description: "NDVI", 
+  region: region, 
+  scale: 30, 
+  crs: "EPSG:4326"
+})

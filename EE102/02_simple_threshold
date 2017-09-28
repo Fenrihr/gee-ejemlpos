@@ -1,0 +1,40 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #d63000 */ee.FeatureCollection(
+        [ee.Feature(
+            ee.Geometry.Point([-114.68490600585943, 36.112361959242996]),
+            {
+              "system:index": "0"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-74.43649291992193, -8.426187168471573]),
+            {
+              "system:index": "1"
+            })]),
+    region = /* color: #98ff00 */ee.Geometry.Polygon(
+        [[[-115.2139663696289, 36.45111307831851],
+          [-115.2139663696289, 35.93659844948654],
+          [-114.0768814086914, 35.93659844948654],
+          [-114.0768814086914, 36.45111307831851]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Simple threshold
+var prepare = function(year) {
+  var date = ee.Date.fromYMD(year, 1, 1)
+  return ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+      .filterDate(date, date.advance(1, "year"))
+      .filter(ee.Filter.lt('CLOUD_COVER', 5))
+      .filterBounds(geometry)
+      .select('B[0-9]')
+      .median()
+}
+
+var median = prepare(2015)
+Map.addLayer(median, {max:0.3, bands:["B4", "B3", "B2"]})
+
+var red = median.select("B4");
+Map.addLayer(red, {min:0, max:0.3}, "Red Band")
+
+// Print a histogram
+print(ui.Chart.image.histogram(red, region, 30))
+
+// Pick a threshold
+Map.addLayer(red.lt(0.1), {}, "Threshold")

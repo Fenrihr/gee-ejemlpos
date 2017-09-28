@@ -1,0 +1,27 @@
+var ndvi = ee.ImageCollection('LANDSAT/LC8_L1T_32DAY_NDVI')
+    .filterDate('2014-01-01', '2015-01-01');
+var vis = {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301'
+]};
+Map.addLayer(ndvi, vis, 'NDVI');
+Map.setCenter(-94.84497, 39.01918, 8);
+
+var panel = ui.Panel();
+ui.root.add(panel);
+
+panel.add(ui.Label('Click on the map', {
+  fontSize: '20px',
+  fontWeight: 'bold'
+}));
+
+var lon = ui.Label();
+var lat = ui.Label();
+panel.add(lon).add(lat);
+
+Map.onClick(function(coords) {
+  lon.setValue('lon: ' + coords.lon);
+  lat.setValue('lat: ' + coords.lat);
+});
+
+Map.style().set('cursor', 'crosshair');

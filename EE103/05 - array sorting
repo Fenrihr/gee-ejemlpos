@@ -1,0 +1,49 @@
+// Arrays simple composite
+
+// Define an arbitrary region of interest as a point.
+var roi = ee.Geometry.Point(-122.26032, 37.87187);
+
+// This function add a cloud score.
+var cloudScore = function(image) {
+  return ee.Algorithms.Landsat.simpleCloudScore(image);
+};
+
+// Load a Landsat collection, map the NDVI and cloud mask functions over it.
+var collection = ee.ImageCollection('LANDSAT/LC8_L1T_TOA')
+  .filterBounds(roi)
+  .map(cloudScore);
+
+// Turn the collection into an array image with
+// 2-D arrays per pixel, to handle masking consistently.
+var array = collection.toArray();
+
+// Make labels for the axes in the array image.
+var imageAxis = 0;
+var bandAxis = 1;
+
+// Slice out the cloud and bands arrays.
+var bands = array.arraySlice(bandAxis, 0, 11);
+var clouds = array.arraySlice(bandAxis, 12);
+
+// Sort by cloudiness. 
+var sorted = bands.arraySort(clouds);
+
+var numImages = sorted.arrayLength(imageAxis).multiply(0.2).int();
+var leastCloudy = sorted.arraySlice(imageAxis, 0, numImages);
+
+var mean = leastCloudy.arrayReduce({
+  reducer: ee.Reducer.mean(), 
+  axes: [imageAxis]
+});
+
+// Get a list of the names of the bands of interest.
+var bandNames = ee.Image(collection.first()).bandNames().slice(0, 11);
+
+// Convert the mean image back to a multi-band image for display.
+var meanImage =  mean
+  .arrayProject([bandAxis])
+  .arrayFlatten([bandNames]);
+
+Map.centerObject(roi, 12);
+var vizParams = {bands: ['B5', 'B4', 'B3'], max: 0.4};
+Map.addLayer(meanImage, vizParams, 'composite');

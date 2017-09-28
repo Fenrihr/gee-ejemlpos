@@ -1,0 +1,45 @@
+var ndvi = ee.ImageCollection('LANDSAT/LC8_L1T_32DAY_NDVI')
+    .filterDate('2014-01-01', '2015-01-01');
+var vis = {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301'
+]};
+Map.addLayer(ndvi, vis, 'NDVI');
+Map.setCenter(-94.84497, 39.01918, 8);
+
+var panel = ui.Panel();
+
+var title = ui.Label({
+  value: 'Click on the map',
+  style: {fontSize: '20px'}
+});
+panel.add(title);
+
+var lon = ui.Label();
+var lat = ui.Label();
+panel.add(lon)
+panel.add(lat);
+
+Map.onClick(function(coords) {
+  lon.setValue('lon: ' + coords.lon);
+  lat.setValue('lat: ' + coords.lat);
+
+  // Add a red dot to the map.
+  var point = ee.Geometry.Point(coords.lon, coords.lat);
+  var dot = ui.Map.Layer(point, {color: 'FF0000'});
+  Map.layers().set(1, dot);
+
+  // Print an NDVI chart.
+  var chart = ui.Chart.image.series(ndvi, point, ee.Reducer.mean(), 200);
+  chart.setOptions({
+    title: 'NDVI Over Time',
+    vAxis: {title: 'NDVI'},
+    hAxis: {title: 'date', format: 'MM-yy', gridlines: {count: 7}},
+  });
+  panel.add(chart);
+});
+
+Map.style().set('cursor', 'crosshair');
+
+// Add the panel to the ui.root.
+ui.root.add(panel);

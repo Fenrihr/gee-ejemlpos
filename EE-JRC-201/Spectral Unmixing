@@ -1,0 +1,75 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var point = /* color: #d63000 */ee.Geometry.Point([-122.21019744873047, 37.62538089936034]),
+    l8 = ee.ImageCollection("LANDSAT/LC8_L1T_TOA"),
+    bare = /* color: #98ff00 */ee.Geometry.Polygon(
+        [[[-122.39533424377441, 37.62578877560354],
+          [-122.40254402160645, 37.62884777608661],
+          [-122.40039825439453, 37.62150596342477],
+          [-122.39653587341309, 37.61287160787662],
+          [-122.38580703735352, 37.606140194351845],
+          [-122.3778247833252, 37.61776679867661],
+          [-122.39035606384277, 37.623205521597406]]]),
+    water = /* color: #0b4a8b */ee.Geometry.Polygon(
+        [[[-122.3543930053711, 37.63537322299909],
+          [-122.35851287841797, 37.622797631179566],
+          [-122.33353614807129, 37.61321156209465],
+          [-122.30323791503906, 37.635237282032804]]]),
+    vegetation = /* color: #ffc82d */ee.Geometry.Polygon(
+        [[[-122.420654296875, 37.5806368917829],
+          [-122.42271423339844, 37.57655555233385],
+          [-122.41722106933594, 37.573834535083186],
+          [-122.41275787353516, 37.56689549107832],
+          [-122.41069793701172, 37.55995580060531],
+          [-122.40623474121094, 37.55560115496389],
+          [-122.39559173583984, 37.55845891987077],
+          [-122.41018295288086, 37.57777997765864]]]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// The purpose of this script is to estimate sub-pixel fractions
+// of identifiable spectral "endmembers".  This involves finding
+// "pure" areas to estimate the endmembers, some matrix algebra
+// followed by the mapping of the fractional cover.
+
+// Use the reflective bands. 
+var bands = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7'];
+
+// First, let's find a cloud free scene in our area of interest.
+// Make a point using the geometry tools and name the import 'point'.
+// Import Landsat 8 TOA data and name the collection 'l8'.
+var image = ee.Image(l8.filterBounds(point).sort('CLOUD_COVER').first()).select(bands);
+Map.addLayer(image, {bands: ['B4', 'B3', 'B2'], max: 0.3}, 'image');
+
+// Now, delineate polygons of 'pure' regions.  Click +New Layer for 
+// each polygon.  Name the imports 'bare', 'vegetation' and 'water'.
+// Get the mean spectrum in each of the endmember polygons.
+var bareMean = image.reduceRegion(ee.Reducer.mean(), bare, 30).values();
+var waterMean = image.reduceRegion(ee.Reducer.mean(), water, 30).values();
+var vegMean = image.reduceRegion(ee.Reducer.mean(), vegetation, 30).values();
+
+// Optional: plot the endmembers
+print(ui.Chart.image.regions(image, ee.FeatureCollection([
+    ee.Feature(bare, {label: 'bare'}), 
+    ee.Feature(water, {label: 'water'}),
+    ee.Feature(vegetation, {label: 'vegetation'})]), 
+  ee.Reducer.mean(), 30, 'label', [0.48, 0.56, 0.65, 0.86, 1.61, 2.2]));
+
+// Turn the endmember lists into an array that can be used in unmixing.
+// Concatenate the lists along the 1-axis to make an array.
+var endmembers = ee.Array.cat([bareMean, vegMean, waterMean], 1);
+
+// Turn the image into an array image, in which each pixel has a 2-D matrix.
+var arrayImage = image.toArray().toArray(1);
+
+// Perform the unmixing in array space using the matrixSolve image method.  
+// Note the need to cast the endmembers into an array image.
+var unmixed = ee.Image(endmembers).matrixSolve(arrayImage);
+
+// Convert the result from an array image back to a multi-band image.
+var unmixedImage = unmixed.arrayProject([0])
+    .arrayFlatten([['bare', 'veg', 'water']]);
+
+// Display the result.
+Map.addLayer(unmixedImage, {}, 'fractions');
+
+// Constrained:
+var constrained = image.unmix([bareMean, vegMean, waterMean], true, true);
+Map.addLayer(constrained, {}, 'constrained fractions');

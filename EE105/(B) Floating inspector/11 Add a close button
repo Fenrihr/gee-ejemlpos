@@ -1,0 +1,52 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var srtm = ee.Image("USGS/SRTMGL1_003"),
+    visParams = {"opacity":1,"bands":["elevation"],"min":0,"max":2300,"palette":["0000ff","008000","ffff00","ffa500","ff0000"]};
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+Map.addLayer(srtm, visParams, 'Elevation');
+
+var label = new ui.Label('Click for elevation');
+var inspector = new ui.Panel([label]);
+Map.add(inspector);
+inspector.setLayout(ui.Panel.Layout.flow('horizontal'));
+
+function inspect(coords) {
+  showInspector();
+  var point = ee.Geometry.Point(coords.lon, coords.lat);
+  var elevation = srtm.sampleRegions(point).first().get('elevation');
+
+  elevation.evaluate(showElevation);
+}
+
+Map.onClick(inspect);
+
+function showElevation(elevation) {
+  inspector.clear();
+  var titleLabel = new ui.Label({
+    value: 'Elevation:',
+    style: {
+      fontWeight: 'bold',
+      stretch: 'vertical',
+    }
+  });
+  inspector.add(titleLabel);
+  
+  var valueLabel = ui.Label(elevation, {stretch: 'vertical'});
+  inspector.add(valueLabel);
+  
+  var closeButton = new ui.Button('Close');
+  inspector.add(closeButton);
+  closeButton.onClick(hideInspector);
+}
+
+Map.style().set('cursor', 'crosshair');
+
+function hideInspector() {
+  inspector.clear();
+  inspector.style().set('shown', false);
+}
+
+function showInspector() {
+  inspector.clear();
+  inspector.add(ui.Label('Loading...', {'color': 'grey'}));
+  inspector.style().set('shown', true);
+}

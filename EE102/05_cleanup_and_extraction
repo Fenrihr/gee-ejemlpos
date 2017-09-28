@@ -1,0 +1,72 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #d63000 */ee.FeatureCollection(
+        [ee.Feature(
+            ee.Geometry.Point([-114.68490600585943, 36.112361959242996]),
+            {
+              "system:index": "0"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-74.43649291992193, -8.426187168471573]),
+            {
+              "system:index": "1"
+            })]),
+    region = /* color: #dbdf06 */ee.Geometry.Polygon(
+        [[[-116.12548828125, 35.36217605914681],
+          [-114.01611328125, 34.95799531086792],
+          [-113.521728515625, 36.70365959719456],
+          [-115.64208984375, 37.10776507118514]]]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Cleanup and extraction.
+var prepare = function(year) {
+  var date = ee.Date.fromYMD(year, 1, 1)
+  return ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+      .filterDate(date, date.advance(1, "year"))
+      .filter(ee.Filter.lt('CLOUD_COVER', 5))
+      .filterBounds(geometry)
+      .select('B[0-9]')
+      .median()
+}
+var median = prepare(2015)
+
+var indices = ee.Image.cat(
+  median.expression("(b(4) - b(3)) / (b(4) + b(3))").rename("ndvi"),
+  median.expression("(b(2) - b(4)) / (b(2) + b(4))").rename("ndwi"),
+  median.expression("(b(2) - b(5)) / (b(2) + b(5))").rename("mndwi"))
+
+var water = indices.expression('b("ndvi") < 0 && b("ndwi") > 0 && b("mndwi") > 0.5').rename("water")
+Map.addLayer(water, {min:0, max:1, palette: "white, black"}, "Water")
+
+// Force 30m/pixel for viewing.
+// WARNING: This is dangerous.
+var forceProjection = function(img) {
+  return img.reproject("EPSG:4326", null, 30)
+}
+
+
+// Morphological "opening".
+var opening = water.focal_max(3).focal_min(3)
+Map.addLayer(forceProjection(opening), {min:0, max:1, palette: "white, blue"}, "Opening", false)
+
+// Morphological "closing".  Removes anything smaller than a 6x6 pixel circle.
+var closing = water.focal_min(3).focal_max(3)
+Map.addLayer(forceProjection(closing), {min:0, max:1, palette: "white, blue"}, "Closing", false)
+
+// Window'd median.
+var median = water.focal_median(6)
+Map.addLayer(forceProjection(median), {min:0, max:1, palette: "white, aqua"}, "Window", false)
+
+// Count connected pixels.  Removes anything smaller than 100 pixels.
+var small = water.connectedPixelCount(100, true).lt(100)
+var connected = water.subtract(small)
+Map.addLayer(forceProjection(connected), {min:0, max:1, palette: "white, orange"}, "Connected", false)
+
+// or vectorization and filter.  Removes anything smaller than 100 pixels.
+var vectors = water.updateMask(water).reduceToVectors({
+  reducer: ee.Reducer.countEvery(), 
+  geometry: region,
+  scale: 30,
+  maxPixels: 1e10,
+}).filter(ee.Filter.gt('count', 100))
+Map.addLayer(vectors, {color: "green"}, "Vectors", false)
+
+Export.table.toDrive(vectors)

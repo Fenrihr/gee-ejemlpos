@@ -1,0 +1,13 @@
+var i1 = ee.Image(1).toArray();
+var i2 = ee.Image(2).toArray();
+var i12 = i1.arrayCat(i2, 0);
+
+var i3 = ee.Image(3).toArray();
+var i4 = ee.Image(4).toArray();
+var i34 = i3.arrayCat(i4, 0);
+
+var i2x2 = i12.arrayCat(i34, 1);
+Map.addLayer(i2x2, {}, '2x2');
+
+var multiband = i2x2.arrayFlatten([['r0', 'r1'], ['c0', 'c1']]);
+Map.addLayer(multiband, {}, 'multiband'); 

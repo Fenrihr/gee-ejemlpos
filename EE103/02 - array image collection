@@ -1,0 +1,35 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #d63000 */ee.Geometry.Point([-122.2119140625, 37.49011473195046]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Arrays Example:
+// Array Image dimensions
+
+// Use these six bands:
+var bands = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6'];
+
+// Load an ImageCollection
+var collection = ee.ImageCollection('LANDSAT/LC8_L1T_TOA')
+    .filterBounds(geometry)
+    .select(bands);
+
+// Turn the collection into an ArrayImage
+var arrayImageCollection = collection.toArray(); 
+
+// Get the array axis lengths as images.
+var axis0 = arrayImageCollection.arrayLength(0);  // N+ (Image axis)
+var axis1 = arrayImageCollection.arrayLength(1);  // 6  (Band axis)
+
+// Turn the collection into an ArrayImage a different way
+var arrayImageCollectionPB = collection.toArrayPerBand(0);
+
+// Get the array axis lengths as images.
+var axis0pb = arrayImageCollectionPB.arrayLength(0);  // 6-band image, each band length N+ array
+var axis1pb = arrayImageCollectionPB.arrayLength(1);  // error
+
+// With the Inspector tab open, click on the map to see array lengths.
+Map.addLayer(ee.Image(collection.first()), {min: 0, max: 0.3, bands: ["B4", "B3", "B2"]});
+Map.addLayer(axis0, {}, 'axis0coll', false);
+Map.addLayer(axis1, {}, 'axis1coll', false);
+Map.addLayer(axis0pb, {}, 'axis0pb', false);
+Map.addLayer(axis1pb, {}, 'axis1pb', false);  // error
+Map.addLayer(arrayImageCollectionPB, {}, 'arrayImageCollectionPB', false)

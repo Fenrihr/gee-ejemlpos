@@ -1,0 +1,5 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var srtm = ee.Image("USGS/SRTMGL1_003"),
+    visParams = {"opacity":1,"bands":["elevation"],"min":0,"max":2300,"palette":["0000ff","008000","ffff00","ffa500","ff0000"]};
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+Map.addLayer(srtm, visParams, 'Elevation');

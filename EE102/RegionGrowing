@@ -1,0 +1,37 @@
+// Simple Edge detection in NDVI
+Map.setCenter(-88.629784,40.880867, 12);
+
+// A median mosaic to work with.
+var landsat = ee.ImageCollection("LANDSAT/LE7_L1T_TOA")
+  .filterDate('2005-04-05', '2006-09-19')
+Map.addLayer(landsat.median(), {min:0, max: 0.3, bands: ["B3", "B2", "B1"]})
+
+//Compute NDVI and threhold to show only active fields
+var landsat_ndvi = landsat.map(function(image) { return image.select("B4", "B3").normalizedDifference() });
+var ndvi_max = landsat_ndvi.max()
+var fields = ndvi_max.gt(0.8)
+var filtered_ndvi = ndvi_max.mask(fields);
+
+var ndvi_palette = [ "FFFFFF", "CE7E45", "DF923D", "F1B555", "FCD163",
+          "99B718", "74A901", "66A000", "529400", "3E8601", "207401",
+          "056201", "004C00", "023B01", "012E01", "011D01", "011301"]
+Map.addLayer(filtered_ndvi, {min:0.0, max:1.0,palette:ndvi_palette},'NDVI_max' );
+
+//Edge detection
+var edge_image1 = ee.Algorithms.CannyEdgeDetector(filtered_ndvi, 0.0 , 1.0);
+var edge_image2 = ee.Algorithms.CannyEdgeDetector(edge_image1, 0.0 , 0.0);
+
+//C lustering algorithm
+var imageClustered = ee.apply("Test.Clustering.RegionGrow", {
+  "image": filtered_ndvi,
+  "useCosine": true,
+  "threshold": 0.04,
+  "maxObjectSize": 256,
+});
+
+var imageConsistent = ee.apply("Test.Clustering.SpatialConsistency", {
+  "image": imageClustered,
+  "maxObjectSize": 256
+});
+
+Map.addLayer(imageClustered.select(["clusters"]).randomVisualizer(), null, "Clusters");

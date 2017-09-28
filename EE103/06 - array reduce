@@ -1,0 +1,58 @@
+// Arrays median composite
+
+// Define an arbitrary region of interest as a point.
+var roi = ee.Geometry.Point(-122.26032, 37.87187);
+
+// This function adds an NDVI band to the image.
+var addNDVI = function(image) {
+  return image.addBands(image.normalizedDifference(['B5', 'B4']));
+};
+
+// This function masks cloudy pixels.
+var cloudMask = function(image) {
+  var clouds = ee.Algorithms.Landsat.simpleCloudScore(image).select(['cloud']);
+  return image.updateMask(clouds.lt(10));
+};
+
+// Load a Landsat collection, map the NDVI and cloud mask functions over it.
+var ndviCollection = ee.ImageCollection('LANDSAT/LC8_L1T_TOA')
+  .filterBounds(roi)
+  .map(addNDVI)
+  .map(cloudMask);
+
+// Turn the collection into an array image with
+// 2-D arrays per pixel, to handle masking consistently.
+var array = ndviCollection.toArray();
+
+// Make labels for the axes in the array image.
+var imageAxis = 0;
+var bandAxis = 1;
+
+// Slice out the quality and bands arrays.
+var bands = array.arraySlice(bandAxis, 0, -1);
+var quality = array.arraySlice(bandAxis, -1); 
+
+// Sort 'bands' using 'quality' as the keys of the sort, to get back the
+// bands of each image ordered by the quality of the corresponding image.
+var sorted = bands.arraySort(quality);
+
+// Find the index of the desired percentile on the image axis.
+var percentile = 0.5;
+var imageCount = sorted.arrayLengths().arrayGet(imageAxis);
+var imageIndex = imageCount.multiply(percentile).int();
+
+// Get a list of the names of the bands of interest.
+var bandNames = ee.Image(ndviCollection.first()).bandNames().slice(0, 12);
+
+// Extract the image at the median position, 
+// convert it back to a multi-band image for display.
+var median = sorted
+  .arraySlice(imageAxis, imageIndex, imageIndex.add(1))
+  .arrayProject([bandAxis])
+  .arrayFlatten([bandNames]);
+
+// Compare the array-based quality composite with a median composite.
+Map.centerObject(roi, 12);
+var vizParams = {bands: ['B5', 'B4', 'B3'], max: 0.4};
+Map.addLayer(ndviCollection.median(), vizParams, 'Band-wise composite');
+Map.addLayer(median, vizParams, 'Array composite');

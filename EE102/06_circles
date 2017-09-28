@@ -1,0 +1,13 @@
+// Center-pivot Irrigation Detector.
+
+Map.setCenter(-106.06, 37.71, 12);
+var palette = [
+  'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718',
+  '74A901', '66A000', '529400', '3E8601', '207401', '056201',
+  '004C00', '023B01', '012E01', '011D01', '011301'];
+
+// Just display the image with the palette.
+var image = ee.Image('LT5_L1T_8DAY_EVI/20110618');
+var threshold = image.gt(0.3)    // Pick a threshold for "active" vegetation,
+Map.addLayer(image, {min:0, max: 1, palette: palette}, 'Landsat EVI');
+Map.addLayer(threshold, null, "Threshold")

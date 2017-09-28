@@ -1,0 +1,23 @@
+// Arrays examples
+// Dimensions and lengths 
+
+var scalar = ee.Array(42);              // 0-D (Number)
+var vector = ee.Array([1, 2, 3]);       // 1-D array, variation on the 0-axis
+var column = ee.Array([[1], [2], [3]]); // 2-D array (3x1), variation on the 0-axis
+var row = ee.Array([[1, 2, 3]]);        // 2-D array (1x3), variation on the 1-axis
+
+// Print the dimensions.
+print(scalar.length());   // 0
+print(vector.length());   // [3]
+print(column.length());   // [3, 1]
+print(row.length());      // [1, 3] 
+
+// Load a Landsat 5 image.
+var image = ee.Image('LANDSAT/LT5_L1T_TOA/LT50440342008045EDC00');
+
+// Convert the multi-band image to an array image.
+var arrayImage = image.toArray()
+Map.addLayer(arrayImage)
+
+var arrayImage2D = arrayImage.toArray(1);
+Map.addLayer(arrayImage2D)

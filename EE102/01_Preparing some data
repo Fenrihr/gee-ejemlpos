@@ -1,0 +1,26 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = /* color: #d63000 */ee.FeatureCollection(
+        [ee.Feature(
+            ee.Geometry.Point([-114.68490600585943, 36.112361959242996]),
+            {
+              "system:index": "0"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-74.43649291992193, -8.426187168471573]),
+            {
+              "system:index": "1"
+            })]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Prepare a composite image for the given year.
+var prepare = function(year) {
+  var date = ee.Date.fromYMD(year, 1, 1)
+  return ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+      .filterDate(date, date.advance(1, "year"))
+      .filter(ee.Filter.lt('CLOUD_COVER', 5))
+      .filterBounds(geometry)
+      .select('B[0-9]')
+      .median()
+}
+
+var median = prepare(2015)
+Map.addLayer(median, {max:0.3, bands:["B4", "B3", "B2"]})
